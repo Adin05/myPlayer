@@ -59,7 +59,7 @@ class ClickableSlider(QSlider):
 class TikTokPlayer(QMainWindow):
     def __init__(self):
         super().__init__()
-        self.setWindowTitle("TikTok-Style Media Player")
+        self.setWindowTitle("My Video Player Style")
         self.resize(500, 800)
         self.setStyleSheet("""
             QMainWindow { background-color: #111; }

@@ -119,7 +119,7 @@ class TikTokPlayer(QMainWindow):
         self.top_row.addWidget(self.btn_search)
 
         self.ui_layout.addLayout(self.top_row)
-        
+
         # --- SEEK BAR ---
         self.seek_layout = QHBoxLayout()
         
@@ -165,6 +165,10 @@ class TikTokPlayer(QMainWindow):
         self.player.positionChanged.connect(self.position_changed)
         self.player.durationChanged.connect(self.duration_changed)
         
+        # Focus policy so we can capture keyboard events
+        self.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
+        self.video_widget.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
+        
         # Try loading config immediately
         self.load_config()
 
@@ -188,6 +192,7 @@ class TikTokPlayer(QMainWindow):
         if folder:
             self.save_config(folder)
             self.scan_folder(folder)
+            self.setFocus() # return focus to main window to detect keys
 
     def scan_folder(self, folder):
         self.info_label.setText(f"Scanning folder...")
@@ -217,8 +222,11 @@ class TikTokPlayer(QMainWindow):
                 self.player.setSource(QUrl.fromLocalFile(media_path))
                 name = os.path.basename(media_path)
                 
-            self.info_label.setText(f"Playing: {name}\nScroll up/down for next!")
+            self.info_label.setText(f"Playing: {name}\nPress UP/DOWN keys to navigate!")
             self.player.play()
+            
+            # Request focus back so keyboard arrows aren't hijacked
+            self.setFocus()
 
     def play_next(self):
         if self.playlist:
@@ -260,6 +268,25 @@ class TikTokPlayer(QMainWindow):
             self.play_next()
         elif angle > 0:
             self.play_prev()
+
+    def keyPressEvent(self, event):
+        if event.key() == Qt.Key.Key_Up:
+            self.play_prev()
+        elif event.key() == Qt.Key.Key_Down:
+            self.play_next()
+        elif event.key() == Qt.Key.Key_Space:
+            if self.player.playbackState() == QMediaPlayer.PlaybackState.PlayingState:
+                self.player.pause()
+            else:
+                self.player.play()
+        elif event.key() == Qt.Key.Key_Left:
+            new_pos = max(0, self.player.position() - 30000)
+            self.player.setPosition(new_pos)
+        elif event.key() == Qt.Key.Key_Right:
+            new_pos = min(self.player.duration(), self.player.position() + 30000)
+            self.player.setPosition(new_pos)
+        else:
+            super().keyPressEvent(event)
 
     def search_youtube(self):
         query = self.search_input.text().strip()

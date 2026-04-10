@@ -8,41 +8,23 @@ from PyQt6.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout,
                              QSlider)
 from PyQt6.QtMultimedia import QMediaPlayer, QAudioOutput
 from PyQt6.QtMultimediaWidgets import QVideoWidget
+from PyQt6.QtGui import QIcon
 
-import yt_dlp
-from ytmusicapi import YTMusic
+
+
 
 CONFIG_FILE = "config.json"
 SUPPORTED_EXT = ['.mp4', '.avi', '.mkv', '.mp3', '.wav', '.flac', '.m4a', '.mov']
 
-class YTSearchThread(QThread):
-    finished = pyqtSignal(str)
 
-    def __init__(self, query):
-        super().__init__()
-        self.query = query
-        self.ytmusic = YTMusic()
 
-    def run(self):
-        try:
-            results = self.ytmusic.search(self.query, filter="songs")
-            if results:
-                video_id = results[0]['videoId']
-                url = f"https://music.youtube.com/watch?v={video_id}"
-                
-                ydl_opts = {
-                    'format': 'bestaudio/best', 
-                    'quiet': True, 
-                    'skip_download': True
-                }
-                with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-                    info = ydl.extract_info(url, download=False)
-                    self.finished.emit(info.get('url', ''))
-            else:
-                self.finished.emit("")
-        except Exception as e:
-            print("YT Search Error:", e)
-            self.finished.emit("")
+
+class VideoWidget(QVideoWidget):
+    doubleClicked = pyqtSignal()
+    
+    def mouseDoubleClickEvent(self, event):
+        self.doubleClicked.emit()
+        super().mouseDoubleClickEvent(event)
 
 
 class ClickableSlider(QSlider):
@@ -60,7 +42,7 @@ class TikTokPlayer(QMainWindow):
     def __init__(self):
         super().__init__()
         self.setWindowTitle("My Video Player Style")
-        self.resize(500, 800)
+        self.resize(520, 600)
         self.setStyleSheet("""
             QMainWindow { background-color: #111; }
             QWidget { color: #fff; font-family: Arial; }
@@ -108,28 +90,15 @@ class TikTokPlayer(QMainWindow):
         
         # --- TOP CONTROLS ---
         self.ui_container = QWidget()
-        self.ui_container.setStyleSheet("background-color: #222; border-bottom: 2px solid #ff0050;")
+        self.ui_container.setStyleSheet("background-color: #222; border-top: 2px solid #ff0050;")
         self.ui_layout = QVBoxLayout(self.ui_container)
         self.ui_layout.setContentsMargins(10, 15, 10, 15)
         self.ui_layout.setSpacing(12)
         
-        self.top_row = QHBoxLayout()
-        
-        self.btn_folder = QPushButton("📁 Folder")
+        self.btn_folder = QPushButton("📁 Select Media Folder")
         self.btn_folder.setToolTip("Select a folder to auto-load media")
         self.btn_folder.clicked.connect(self.select_folder)
-        self.top_row.addWidget(self.btn_folder)
-
-        self.search_input = QLineEdit()
-        self.search_input.setPlaceholderText("Search YT Music...")
-        self.search_input.returnPressed.connect(self.search_youtube)
-        self.top_row.addWidget(self.search_input)
-
-        self.btn_search = QPushButton("Play YT")
-        self.btn_search.clicked.connect(self.search_youtube)
-        self.top_row.addWidget(self.btn_search)
-
-        self.ui_layout.addLayout(self.top_row)
+        self.ui_layout.addWidget(self.btn_folder)
 
         # --- SEEK BAR ---
         self.seek_layout = QHBoxLayout()
@@ -147,13 +116,13 @@ class TikTokPlayer(QMainWindow):
         self.ui_layout.addLayout(self.seek_layout)
 
         # Info Label (Now Playing, Status)
-        self.info_label = QLabel("Ready. Click 'Folder' or search YT above.")
+        self.info_label = QLabel("Ready. Click 'Select Media Folder' to start.")
         self.info_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.info_label.setWordWrap(True)
         self.info_label.setStyleSheet("color: #aaa;")
         self.ui_layout.addWidget(self.info_label)
         
-        self.layout.addWidget(self.ui_container)
+        # UI container will be added later at the bottom
 
         # --- VIDEO PLAYER AREA ---
         self.video_container = QWidget()
@@ -161,10 +130,12 @@ class TikTokPlayer(QMainWindow):
         self.video_layout = QVBoxLayout(self.video_container)
         self.video_layout.setContentsMargins(0, 0, 0, 0)
         
-        self.video_widget = QVideoWidget()
+        self.video_widget = VideoWidget()
+        self.video_widget.doubleClicked.connect(self.toggle_fullscreen)
         self.video_layout.addWidget(self.video_widget)
         
         self.layout.addWidget(self.video_container, stretch=1)
+        self.layout.addWidget(self.ui_container)
         
         # Multimedia initialization
         self.player = QMediaPlayer()
@@ -175,6 +146,9 @@ class TikTokPlayer(QMainWindow):
         self.player.mediaStatusChanged.connect(self.on_media_status_changed)
         self.player.positionChanged.connect(self.position_changed)
         self.player.durationChanged.connect(self.duration_changed)
+        
+        # Auto-fit connection: resize window when video size is detected
+        self.video_widget.videoSink().videoSizeChanged.connect(self.resize_to_video)
         
         # Focus policy so we can capture keyboard events
         self.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
@@ -224,14 +198,9 @@ class TikTokPlayer(QMainWindow):
     def play_current(self):
         if self.playlist and 0 <= self.current_idx < len(self.playlist):
             media_path = self.playlist[self.current_idx]
-            
-            # Detect YouTube Stream URL vs Local File
-            if media_path.startswith("http"):
-                self.player.setSource(QUrl(media_path))
-                name = "YouTube Music Stream"
-            else:
-                self.player.setSource(QUrl.fromLocalFile(media_path))
-                name = os.path.basename(media_path)
+            # Set local file source
+            self.player.setSource(QUrl.fromLocalFile(media_path))
+            name = os.path.basename(media_path)
                 
             self.info_label.setText(f"Playing: {name}\nPress UP/DOWN keys to navigate!")
             self.player.play()
@@ -258,6 +227,39 @@ class TikTokPlayer(QMainWindow):
         s = round(ms / 1000)
         m, s = divmod(s, 60)
         return f"{m:02d}:{s:02d}"
+
+    def resize_to_video(self, size=None):
+        if size is None:
+            size = self.video_widget.videoSink().videoSize()
+            
+        if size.isEmpty() or self.isFullScreen():
+            return
+            
+        # Get target dimensions while keeping a reasonable height
+        target_height = 600
+        aspect_ratio = size.width() / size.height()
+        target_width = int(target_height * aspect_ratio)
+        
+        # Ensure it's not too wide or too narrow
+        target_width = max(300, min(target_width, 1200))
+        
+        # Account for the UI container height at the bottom
+        ui_height = self.ui_container.sizeHint().height()
+        self.resize(target_width, target_height + ui_height)
+        
+        # Center the window on the screen if it was just loaded
+        frame = self.frameGeometry()
+        center = self.screen().availableGeometry().center()
+        frame.moveCenter(center)
+        self.move(frame.topLeft())
+
+    def toggle_fullscreen(self):
+        if self.isFullScreen():
+            self.showNormal()
+            self.ui_container.show()
+        else:
+            self.showFullScreen()
+            self.ui_container.hide() # Hide controls in fullscreen for TikTok feel
 
     def position_changed(self, position):
         if not self.seek_slider.isSliderDown():
@@ -296,33 +298,15 @@ class TikTokPlayer(QMainWindow):
         elif event.key() == Qt.Key.Key_Right:
             new_pos = min(self.player.duration(), self.player.position() + 30000)
             self.player.setPosition(new_pos)
+        elif event.key() == Qt.Key.Key_F:
+            self.toggle_fullscreen()
+        elif event.key() == Qt.Key.Key_Escape:
+            if self.isFullScreen():
+                self.toggle_fullscreen()
         else:
             super().keyPressEvent(event)
 
-    def search_youtube(self):
-        query = self.search_input.text().strip()
-        if not query:
-            return
-            
-        self.btn_search.setText("...")
-        self.btn_search.setEnabled(False)
-        self.info_label.setText(f"Searching Youtube Music for: '{query}'...")
-        
-        self.search_thread = YTSearchThread(query)
-        self.search_thread.finished.connect(self.on_youtube_result)
-        self.search_thread.start()
 
-    def on_youtube_result(self, stream_url):
-        self.btn_search.setText("Play YT")
-        self.btn_search.setEnabled(True)
-        self.search_input.clear()
-        
-        if stream_url:
-            self.playlist.insert(self.current_idx + 1, stream_url)
-            self.current_idx += 1
-            self.play_current()
-        else:
-            self.info_label.setText("YT Search failed. Could not fetch stream.")
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)

@@ -45,6 +45,17 @@ class YTSearchThread(QThread):
             self.finished.emit("")
 
 
+class ClickableSlider(QSlider):
+    def mousePressEvent(self, event):
+        if event.button() == Qt.MouseButton.LeftButton:
+            # Calculate value directly from the X click position
+            val = self.minimum() + ((self.maximum() - self.minimum()) * event.pos().x()) / self.width()
+            self.setValue(int(val))
+            self.sliderMoved.emit(int(val))
+        # Keep base behavior (like drag to slide)
+        super().mousePressEvent(event)
+
+
 class TikTokPlayer(QMainWindow):
     def __init__(self):
         super().__init__()
@@ -123,7 +134,7 @@ class TikTokPlayer(QMainWindow):
         # --- SEEK BAR ---
         self.seek_layout = QHBoxLayout()
         
-        self.seek_slider = QSlider(Qt.Orientation.Horizontal)
+        self.seek_slider = ClickableSlider(Qt.Orientation.Horizontal)
         self.seek_slider.setCursor(Qt.CursorShape.PointingHandCursor)
         self.seek_slider.setRange(0, 0)
         self.seek_slider.sliderMoved.connect(self.set_position)

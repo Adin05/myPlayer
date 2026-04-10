@@ -1,14 +1,15 @@
 # My Video Player Style
 
-A minimal, TikTok-style media player built in Python and PyQt6. It elegantly plays your local videos and music while supporting integrated YouTube Music search streams!
+A minimal, TikTok-style media player built in Python and PyQt6. It elegantly plays your local videos and music with automatic aspect ratio fitting and immersive fullscreen controls.
 
 ## Features
-- **TikTok-Style Scrolling**: Instantly scroll through your media library using your mouse wheel.
-- **Keyboard Shortcuts**: Control playback without the mouse (Up/Down skipping, Spacebar pause, Left/Right seeking).
-- **Universal Media Support**: Plays `.mp4`, `.avi`, `.mkv`, `.mp3`, `.wav`, `.m4a`, and `.flac`.
-- **YouTube Music Integration**: Search for any song on YouTube Music and magically play the audio stream directly within the app.
+- **TikTok-Style scrolling**: Instantly navigate through your media library using your mouse wheel.
+- **Auto-Fit Display**: Automatically resizes the window to match each video's aspect ratio (targets a sleek 600px height by default).
+- **Immersive Fullscreen**: View your media without distractions by toggling fullscreen mode.
+- **Keyboard Mastery**: Full control via keyboard (Up/Down skipping, Spacebar pause, Left/Right 30s seeking).
+- **Universal Media Support**: Plays `.mp4`, `.avi`, `.mkv`, `.mp3`, `.wav`, `.m4a`, `.mov`, and `.flac`.
 - **Clickable Progress Bar**: Instantly seek through the timeline by clicking anywhere on the track.
-- **Auto-Memory**: Remembers your designated media folder across sessions.
+- **Persistent Memory**: Remembers your preferred media folder across sessions.
 
 ## Developer Installation
 
@@ -32,11 +33,13 @@ python main.py
 ```
 
 ## Application Controls
-- **Up Arrow** / **`Mouse Scroll Up`**: Skip to the previous video/song.
-- **Down Arrow** / **`Mouse Scroll Down`**: Skip to the next video/song.
+- **Up Arrow** / **`Mouse Scroll Up`**: Previous video/song.
+- **Down Arrow** / **`Mouse Scroll Down`**: Next video/song.
 - **Left Arrow**: Rewind 30 seconds.
 - **Right Arrow**: Fast-forward 30 seconds.
 - **Spacebar**: Play / Pause playback.
+- **`F` Key** / **`Double-Click Video`**: Toggle Fullscreen.
+- **`Esc` Key**: Exit Fullscreen.
 
 ## Deployment (Creating an `.exe` version)
 
@@ -47,9 +50,9 @@ If you'd like to create a standalone executable so you don't have to launch it v
    pip install pyinstaller
    ```
 
-2. Run the build command (the `--windowed` flag hides the messy background console while `--name` sets the app title):
+2. Run the build command (the `--windowed` flag hides the background console while `--name` sets the app title):
    ```cmd
    pyinstaller --name "My Video Player Style" --windowed --onefile main.py
    ```
 
-3. Once completed, navigate into the incredibly fresh `dist` folder to find your generated `My Video Player Style.exe` application! You can make a shortcut of it directly to your Desktop.
+3. Once completed, navigate into the `dist` folder to find your generated `My Video Player Style.exe` application! You can make a shortcut of it directly to your Desktop.

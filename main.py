@@ -4,7 +4,8 @@ import random
 import json
 from PyQt6.QtCore import Qt, QUrl, QThread, pyqtSignal
 from PyQt6.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout, 
-                             QPushButton, QFileDialog, QLabel, QLineEdit, QHBoxLayout)
+                             QPushButton, QFileDialog, QLabel, QLineEdit, QHBoxLayout,
+                             QSlider)
 from PyQt6.QtMultimedia import QMediaPlayer, QAudioOutput
 from PyQt6.QtMultimediaWidgets import QVideoWidget
 
@@ -63,6 +64,25 @@ class TikTokPlayer(QMainWindow):
             }
             QPushButton:hover { background-color: #d00040; }
             QPushButton:disabled { background-color: #555; }
+            
+            /* Custom Seek Bar Styling */
+            QSlider::groove:horizontal {
+                border: 1px solid #444;
+                height: 6px;
+                background: #333;
+                border-radius: 3px;
+            }
+            QSlider::sub-page:horizontal {
+                background: #ff0050;
+                border-radius: 3px;
+            }
+            QSlider::handle:horizontal {
+                background: white;
+                width: 14px;
+                margin-top: -4px;
+                margin-bottom: -4px;
+                border-radius: 7px;
+            }
         """)
 
         self.playlist = []
@@ -75,11 +95,12 @@ class TikTokPlayer(QMainWindow):
         self.layout.setContentsMargins(0, 0, 0, 0)
         self.layout.setSpacing(0)
         
-        # --- TOP CONTROLS (Always Visible) ---
+        # --- TOP CONTROLS ---
         self.ui_container = QWidget()
         self.ui_container.setStyleSheet("background-color: #222; border-bottom: 2px solid #ff0050;")
         self.ui_layout = QVBoxLayout(self.ui_container)
         self.ui_layout.setContentsMargins(10, 15, 10, 15)
+        self.ui_layout.setSpacing(12)
         
         self.top_row = QHBoxLayout()
         
@@ -99,11 +120,26 @@ class TikTokPlayer(QMainWindow):
 
         self.ui_layout.addLayout(self.top_row)
         
+        # --- SEEK BAR ---
+        self.seek_layout = QHBoxLayout()
+        
+        self.seek_slider = QSlider(Qt.Orientation.Horizontal)
+        self.seek_slider.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.seek_slider.setRange(0, 0)
+        self.seek_slider.sliderMoved.connect(self.set_position)
+        self.seek_layout.addWidget(self.seek_slider)
+        
+        self.time_label = QLabel("00:00 / 00:00")
+        self.time_label.setStyleSheet("color: #ccc; font-size: 13px; font-weight: bold; margin-left: 8px;")
+        self.seek_layout.addWidget(self.time_label)
+        
+        self.ui_layout.addLayout(self.seek_layout)
+
         # Info Label (Now Playing, Status)
         self.info_label = QLabel("Ready. Click 'Folder' or search YT above.")
         self.info_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.info_label.setWordWrap(True)
-        self.info_label.setStyleSheet("color: #aaa; margin-top: 5px;")
+        self.info_label.setStyleSheet("color: #aaa;")
         self.ui_layout.addWidget(self.info_label)
         
         self.layout.addWidget(self.ui_container)
@@ -126,6 +162,8 @@ class TikTokPlayer(QMainWindow):
         self.player.setVideoOutput(self.video_widget)
         
         self.player.mediaStatusChanged.connect(self.on_media_status_changed)
+        self.player.positionChanged.connect(self.position_changed)
+        self.player.durationChanged.connect(self.duration_changed)
         
         # Try loading config immediately
         self.load_config()
@@ -179,7 +217,7 @@ class TikTokPlayer(QMainWindow):
                 self.player.setSource(QUrl.fromLocalFile(media_path))
                 name = os.path.basename(media_path)
                 
-            self.info_label.setText(f"Playing: {name}\nScroll for next/prev!")
+            self.info_label.setText(f"Playing: {name}\nScroll up/down for next!")
             self.player.play()
 
     def play_next(self):
@@ -196,6 +234,25 @@ class TikTokPlayer(QMainWindow):
         # Auto-play next on end
         if status == QMediaPlayer.MediaStatus.EndOfMedia:
             self.play_next()
+
+    def format_time(self, ms):
+        s = round(ms / 1000)
+        m, s = divmod(s, 60)
+        return f"{m:02d}:{s:02d}"
+
+    def position_changed(self, position):
+        if not self.seek_slider.isSliderDown():
+            self.seek_slider.setValue(position)
+        
+        current_time = self.format_time(position)
+        total_time = self.format_time(self.player.duration())
+        self.time_label.setText(f"{current_time} / {total_time}")
+
+    def duration_changed(self, duration):
+        self.seek_slider.setRange(0, duration)
+
+    def set_position(self, position):
+        self.player.setPosition(position)
 
     def wheelEvent(self, event):
         angle = event.angleDelta().y()

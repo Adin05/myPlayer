@@ -6,9 +6,10 @@ A minimal, TikTok-style media player built in Python and PyQt6. It elegantly pla
 - **TikTok-Style scrolling**: Instantly navigate through your media library using your mouse wheel.
 - **Auto-Fit Display**: Automatically resizes the window to match each video's aspect ratio (targets a sleek 600px height by default).
 - **Immersive Fullscreen**: View your media without distractions by toggling fullscreen mode.
-- **Keyboard Mastery**: Full control via keyboard (Up/Down skipping, Spacebar pause, Left/Right 30s seeking).
+- **Keyboard Mastery**: Full control via keyboard (Up/Down skipping, Spacebar pause, Left/Right seeking by 5% of the current video length, rounded up to the next whole second).
 - **Universal Media Support**: Plays `.mp4`, `.avi`, `.mkv`, `.mp3`, `.wav`, `.m4a`, `.mov`, and `.flac`.
 - **Clickable Progress Bar**: Instantly seek through the timeline by clicking anywhere on the track.
+- **Click to Play/Pause**: Click the video area to toggle playback.
 - **Persistent Memory**: Remembers your preferred media folder across sessions.
 
 ## Developer Installation
@@ -35,9 +36,10 @@ python main.py
 ## Application Controls
 - **Up Arrow** / **`Mouse Scroll Up`**: Previous video/song.
 - **Down Arrow** / **`Mouse Scroll Down`**: Next video/song.
-- **Left Arrow**: Rewind 30 seconds.
-- **Right Arrow**: Fast-forward 30 seconds.
+- **Left Arrow**: Rewind by 5% of the current media length, rounded up to the next whole second.
+- **Right Arrow**: Fast-forward by 5% of the current media length, rounded up to the next whole second.
 - **Spacebar**: Play / Pause playback.
+- **Single Click Video**: Play / Pause playback.
 - **`F` Key** / **`Double-Click Video`**: Toggle Fullscreen.
 - **`Esc` Key**: Exit Fullscreen.
 

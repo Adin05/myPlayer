@@ -2,6 +2,7 @@ import sys
 import os
 import random
 import json
+import math
 from PyQt6.QtCore import Qt, QUrl, QThread, QTimer, pyqtSignal
 from PyQt6.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout, 
                              QPushButton, QFileDialog, QLabel, QLineEdit, QHBoxLayout,
@@ -58,6 +59,8 @@ class ClickableSlider(QSlider):
 
 
 class TikTokPlayer(QMainWindow):
+    SEEK_PERCENT = 0.05
+
     def __init__(self):
         super().__init__()
         self.setWindowTitle("My Video Player Style")
@@ -184,8 +187,8 @@ class TikTokPlayer(QMainWindow):
         shortcuts = [
             ("Up", self.play_prev),
             ("Down", self.play_next),
-            ("Left", lambda: self.seek_relative(-30000)),
-            ("Right", lambda: self.seek_relative(30000)),
+            ("Left", lambda: self.seek_relative(-self._seek_step_ms())),
+            ("Right", lambda: self.seek_relative(self._seek_step_ms())),
             ("Space", self.toggle_play_pause),
             ("F", self.toggle_fullscreen),
             ("Esc", self.exit_fullscreen),
@@ -271,6 +274,10 @@ class TikTokPlayer(QMainWindow):
         new_pos = max(0, min(self.player.duration(), self.player.position() + delta_ms))
         self.player.setPosition(new_pos)
 
+    def _seek_step_ms(self):
+        step_ms = self.player.duration() * self.SEEK_PERCENT
+        return max(1000, int(math.ceil(step_ms / 1000.0) * 1000))
+
     def on_media_status_changed(self, status):
         # Auto-play next on end
         if status == QMediaPlayer.MediaStatus.EndOfMedia:
@@ -343,9 +350,9 @@ class TikTokPlayer(QMainWindow):
         elif event.key() == Qt.Key.Key_Space:
             self.toggle_play_pause()
         elif event.key() == Qt.Key.Key_Left:
-            self.seek_relative(-30000)
+            self.seek_relative(-self._seek_step_ms())
         elif event.key() == Qt.Key.Key_Right:
-            self.seek_relative(30000)
+            self.seek_relative(self._seek_step_ms())
         elif event.key() == Qt.Key.Key_F:
             self.toggle_fullscreen()
         elif event.key() == Qt.Key.Key_Escape:

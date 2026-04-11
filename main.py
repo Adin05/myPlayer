@@ -2,13 +2,13 @@ import sys
 import os
 import random
 import json
-from PyQt6.QtCore import Qt, QUrl, QThread, pyqtSignal
+from PyQt6.QtCore import Qt, QUrl, QThread, QTimer, pyqtSignal
 from PyQt6.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout, 
                              QPushButton, QFileDialog, QLabel, QLineEdit, QHBoxLayout,
                              QSlider)
 from PyQt6.QtMultimedia import QMediaPlayer, QAudioOutput
 from PyQt6.QtMultimediaWidgets import QVideoWidget
-from PyQt6.QtGui import QIcon
+from PyQt6.QtGui import QIcon, QKeySequence, QShortcut
 
 
 
@@ -20,11 +20,30 @@ SUPPORTED_EXT = ['.mp4', '.avi', '.mkv', '.mp3', '.wav', '.flac', '.m4a', '.mov'
 
 
 class VideoWidget(QVideoWidget):
+    clicked = pyqtSignal()
     doubleClicked = pyqtSignal()
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self._click_timer = QTimer(self)
+        self._click_timer.setSingleShot(True)
+        self._click_timer.timeout.connect(self.clicked.emit)
+        self._ignore_next_release = False
     
+    def mouseReleaseEvent(self, event):
+        if event.button() == Qt.MouseButton.LeftButton:
+            if self._ignore_next_release:
+                self._ignore_next_release = False
+            else:
+                self._click_timer.start(QApplication.doubleClickInterval())
+        super().mouseReleaseEvent(event)
+
     def mouseDoubleClickEvent(self, event):
+        if self._click_timer.isActive():
+            self._click_timer.stop()
+        self._ignore_next_release = True
         self.doubleClicked.emit()
-        super().mouseDoubleClickEvent(event)
+        event.accept()
 
 
 class ClickableSlider(QSlider):
@@ -105,6 +124,7 @@ class TikTokPlayer(QMainWindow):
         
         self.seek_slider = ClickableSlider(Qt.Orientation.Horizontal)
         self.seek_slider.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.seek_slider.setFocusPolicy(Qt.FocusPolicy.NoFocus)
         self.seek_slider.setRange(0, 0)
         self.seek_slider.sliderMoved.connect(self.set_position)
         self.seek_layout.addWidget(self.seek_slider)
@@ -131,6 +151,7 @@ class TikTokPlayer(QMainWindow):
         self.video_layout.setContentsMargins(0, 0, 0, 0)
         
         self.video_widget = VideoWidget()
+        self.video_widget.clicked.connect(self.toggle_play_pause)
         self.video_widget.doubleClicked.connect(self.toggle_fullscreen)
         self.video_layout.addWidget(self.video_widget)
         
@@ -153,9 +174,29 @@ class TikTokPlayer(QMainWindow):
         # Focus policy so we can capture keyboard events
         self.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
         self.video_widget.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
+
+        self._setup_shortcuts()
         
         # Try loading config immediately
         self.load_config()
+
+    def _setup_shortcuts(self):
+        shortcuts = [
+            ("Up", self.play_prev),
+            ("Down", self.play_next),
+            ("Left", lambda: self.seek_relative(-30000)),
+            ("Right", lambda: self.seek_relative(30000)),
+            ("Space", self.toggle_play_pause),
+            ("F", self.toggle_fullscreen),
+            ("Esc", self.exit_fullscreen),
+        ]
+
+        self._shortcuts = []
+        for key, handler in shortcuts:
+            shortcut = QShortcut(QKeySequence(key), self)
+            shortcut.setContext(Qt.ShortcutContext.ApplicationShortcut)
+            shortcut.activated.connect(handler)
+            self._shortcuts.append(shortcut)
 
     def load_config(self):
         if os.path.exists(CONFIG_FILE):
@@ -217,6 +258,18 @@ class TikTokPlayer(QMainWindow):
         if self.playlist:
             self.current_idx = (self.current_idx - 1) % len(self.playlist)
             self.play_current()
+
+    def toggle_play_pause(self):
+        if self.player.playbackState() == QMediaPlayer.PlaybackState.PlayingState:
+            self.player.pause()
+        else:
+            self.player.play()
+
+    def seek_relative(self, delta_ms):
+        if self.player.duration() <= 0:
+            return
+        new_pos = max(0, min(self.player.duration(), self.player.position() + delta_ms))
+        self.player.setPosition(new_pos)
 
     def on_media_status_changed(self, status):
         # Auto-play next on end
@@ -288,23 +341,21 @@ class TikTokPlayer(QMainWindow):
         elif event.key() == Qt.Key.Key_Down:
             self.play_next()
         elif event.key() == Qt.Key.Key_Space:
-            if self.player.playbackState() == QMediaPlayer.PlaybackState.PlayingState:
-                self.player.pause()
-            else:
-                self.player.play()
+            self.toggle_play_pause()
         elif event.key() == Qt.Key.Key_Left:
-            new_pos = max(0, self.player.position() - 30000)
-            self.player.setPosition(new_pos)
+            self.seek_relative(-30000)
         elif event.key() == Qt.Key.Key_Right:
-            new_pos = min(self.player.duration(), self.player.position() + 30000)
-            self.player.setPosition(new_pos)
+            self.seek_relative(30000)
         elif event.key() == Qt.Key.Key_F:
             self.toggle_fullscreen()
         elif event.key() == Qt.Key.Key_Escape:
-            if self.isFullScreen():
-                self.toggle_fullscreen()
+            self.exit_fullscreen()
         else:
             super().keyPressEvent(event)
+
+    def exit_fullscreen(self):
+        if self.isFullScreen():
+            self.toggle_fullscreen()
 
 
 

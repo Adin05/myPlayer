@@ -60,6 +60,7 @@ class ClickableSlider(QSlider):
 
 class TikTokPlayer(QMainWindow):
     SEEK_PERCENT = 0.05
+    DEFAULT_VOLUME = 70
 
     def __init__(self):
         super().__init__()
@@ -102,6 +103,7 @@ class TikTokPlayer(QMainWindow):
 
         self.playlist = []
         self.current_idx = -1
+        self.current_folder = ""
 
         # Central Layout
         self.central_widget = QWidget()
@@ -138,6 +140,26 @@ class TikTokPlayer(QMainWindow):
         
         self.ui_layout.addLayout(self.seek_layout)
 
+        # --- VOLUME CONTROL ---
+        self.volume_layout = QHBoxLayout()
+        self.volume_label = QLabel("Volume")
+        self.volume_label.setStyleSheet("color: #ccc; font-size: 13px; font-weight: bold; margin-right: 8px;")
+        self.volume_layout.addWidget(self.volume_label)
+
+        self.volume_slider = ClickableSlider(Qt.Orientation.Horizontal)
+        self.volume_slider.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.volume_slider.setFocusPolicy(Qt.FocusPolicy.NoFocus)
+        self.volume_slider.setRange(0, 100)
+        self.volume_slider.setValue(self.DEFAULT_VOLUME)
+        self.volume_slider.valueChanged.connect(self.set_volume)
+        self.volume_layout.addWidget(self.volume_slider)
+
+        self.volume_value_label = QLabel(f"{self.DEFAULT_VOLUME}%")
+        self.volume_value_label.setStyleSheet("color: #ccc; font-size: 13px; font-weight: bold; margin-left: 8px;")
+        self.volume_layout.addWidget(self.volume_value_label)
+
+        self.ui_layout.addLayout(self.volume_layout)
+
         # Info Label (Now Playing, Status)
         self.info_label = QLabel("Ready. Click 'Select Media Folder' to start.")
         self.info_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
@@ -164,6 +186,7 @@ class TikTokPlayer(QMainWindow):
         # Multimedia initialization
         self.player = QMediaPlayer()
         self.audio_output = QAudioOutput()
+        self.audio_output.setVolume(self.DEFAULT_VOLUME / 100.0)
         self.player.setAudioOutput(self.audio_output)
         self.player.setVideoOutput(self.video_widget)
         
@@ -207,21 +230,41 @@ class TikTokPlayer(QMainWindow):
                 with open(CONFIG_FILE, 'r') as f:
                     config = json.load(f)
                     folder = config.get("folder", "")
+                    volume = config.get("volume", self.DEFAULT_VOLUME)
+                    volume = max(0, min(100, int(volume)))
+                    self.volume_slider.setValue(volume)
+                    self.set_volume(volume, persist=False)
                     if folder and os.path.exists(folder):
+                        self.current_folder = folder
                         self.scan_folder(folder)
             except Exception as e:
                 print("Failed to load config:", e)
 
-    def save_config(self, folder):
+    def save_config(self, folder=None):
+        folder_to_save = self.current_folder if folder is None else folder
+        self.current_folder = folder_to_save or ""
         with open(CONFIG_FILE, 'w') as f:
-            json.dump({"folder": folder}, f)
+            json.dump(
+                {
+                    "folder": self.current_folder,
+                    "volume": self.volume_slider.value(),
+                },
+                f
+            )
 
     def select_folder(self):
         folder = QFileDialog.getExistingDirectory(self, "Select Media Folder")
         if folder:
+            self.current_folder = folder
             self.save_config(folder)
             self.scan_folder(folder)
             self.setFocus() # return focus to main window to detect keys
+
+    def set_volume(self, value, persist=True):
+        self.audio_output.setVolume(value / 100.0)
+        self.volume_value_label.setText(f"{value}%")
+        if persist:
+            self.save_config()
 
     def scan_folder(self, folder):
         self.info_label.setText(f"Scanning folder...")

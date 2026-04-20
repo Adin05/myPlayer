@@ -14,7 +14,14 @@ from PyQt6.QtGui import QIcon, QKeySequence, QShortcut
 
 
 
-CONFIG_FILE = "config.json"
+def get_config_path():
+    if getattr(sys, "frozen", False):
+        app_dir = os.path.dirname(sys.executable)
+    else:
+        app_dir = os.path.dirname(os.path.abspath(__file__))
+    return os.path.join(app_dir, "config.json")
+
+CONFIG_FILE = get_config_path()
 SUPPORTED_EXT = ['.mp4', '.avi', '.mkv', '.mp3', '.wav', '.flac', '.m4a', '.mov']
 
 

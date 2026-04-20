@@ -15,11 +15,11 @@ from PyQt6.QtGui import QIcon, QKeySequence, QShortcut
 
 
 def get_config_path():
-    if getattr(sys, "frozen", False):
-        app_dir = os.path.dirname(sys.executable)
-    else:
-        app_dir = os.path.dirname(os.path.abspath(__file__))
-    return os.path.join(app_dir, "config.json")
+    # Use user app data directory for config to avoid conflicts between dev and bundled app
+    app_data = os.path.expanduser("~\\AppData\\Roaming")
+    config_dir = os.path.join(app_data, "MyVideoPlayer")
+    os.makedirs(config_dir, exist_ok=True)
+    return os.path.join(config_dir, "config.json")
 
 CONFIG_FILE = get_config_path()
 SUPPORTED_EXT = ['.mp4', '.avi', '.mkv', '.mp3', '.wav', '.flac', '.m4a', '.mov']

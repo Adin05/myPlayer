@@ -334,7 +334,7 @@ class TikTokPlayer(QMainWindow):
 
     def play_prev(self):
         if self.playlist:
-            self.current_idx = (self.current_idx - 1) % len(self.playlist)
+            self.current_idx = random.randint(0, len(self.playlist) - 1)
             self.play_current()
 
     def toggle_play_pause(self):

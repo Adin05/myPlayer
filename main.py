@@ -6,7 +6,7 @@ import math
 from PyQt6.QtCore import Qt, QUrl, QThread, QTimer, pyqtSignal
 from PyQt6.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout, 
                              QPushButton, QFileDialog, QLabel, QLineEdit, QHBoxLayout,
-                             QSlider)
+                             QSlider, QComboBox)
 from PyQt6.QtMultimedia import QMediaPlayer, QAudioOutput
 from PyQt6.QtMultimediaWidgets import QVideoWidget
 from PyQt6.QtGui import QIcon, QKeySequence, QShortcut
@@ -100,7 +100,8 @@ class ClickableSlider(QSlider):
 
 
 class TikTokPlayer(QMainWindow):
-    SEEK_PERCENT = 0.05
+    SEEK_PERCENT = 0.05  # default, overridden by user selection
+    SEEK_OPTIONS = [1, 2, 3, 5, 10, 15, 20, 25]  # available seek % choices
     DEFAULT_VOLUME = 70
 
     def __init__(self):
@@ -139,6 +140,37 @@ class TikTokPlayer(QMainWindow):
                 margin-top: -4px;
                 margin-bottom: -4px;
                 border-radius: 7px;
+            }
+            
+            /* Seek Percent ComboBox Styling */
+            QComboBox {
+                background-color: #333;
+                border: 1px solid #555;
+                padding: 6px 10px;
+                border-radius: 6px;
+                color: #fff;
+                font-size: 13px;
+                font-weight: bold;
+            }
+            QComboBox:hover { border-color: #ff0050; }
+            QComboBox::drop-down {
+                border: none;
+                width: 24px;
+            }
+            QComboBox::down-arrow {
+                image: none;
+                border-left: 5px solid transparent;
+                border-right: 5px solid transparent;
+                border-top: 6px solid #ff0050;
+                margin-right: 8px;
+            }
+            QComboBox QAbstractItemView {
+                background-color: #333;
+                color: #fff;
+                selection-background-color: #ff0050;
+                border: 1px solid #555;
+                border-radius: 4px;
+                padding: 4px;
             }
         """)
 
@@ -200,6 +232,25 @@ class TikTokPlayer(QMainWindow):
         self.volume_layout.addWidget(self.volume_value_label)
 
         self.ui_layout.addLayout(self.volume_layout)
+
+        # --- SEEK PERCENT CONTROL ---
+        self.seek_pct_layout = QHBoxLayout()
+        self.seek_pct_label = QLabel("Seek Step")
+        self.seek_pct_label.setStyleSheet("color: #ccc; font-size: 13px; font-weight: bold; margin-right: 8px;")
+        self.seek_pct_layout.addWidget(self.seek_pct_label)
+
+        self.seek_pct_combo = QComboBox()
+        self.seek_pct_combo.setFocusPolicy(Qt.FocusPolicy.NoFocus)
+        self.seek_pct_combo.setCursor(Qt.CursorShape.PointingHandCursor)
+        for pct in self.SEEK_OPTIONS:
+            self.seek_pct_combo.addItem(f"{pct}%", pct)
+        # Set default to 5%
+        default_idx = self.SEEK_OPTIONS.index(5)
+        self.seek_pct_combo.setCurrentIndex(default_idx)
+        self.seek_pct_combo.currentIndexChanged.connect(self.on_seek_pct_changed)
+        self.seek_pct_layout.addWidget(self.seek_pct_combo, stretch=1)
+
+        self.ui_layout.addLayout(self.seek_pct_layout)
 
         # Info Label (Now Playing, Status)
         self.info_label = QLabel("Ready. Click 'Select Media Folder' to start.")
@@ -272,6 +323,14 @@ class TikTokPlayer(QMainWindow):
             volume = max(0, min(100, int(volume)))
             self.volume_slider.setValue(volume)
             self.set_volume(volume, persist=False)
+
+            # Restore seek percent
+            seek_pct = int(_db_get("seek_percent", "5"))
+            if seek_pct in self.SEEK_OPTIONS:
+                idx = self.SEEK_OPTIONS.index(seek_pct)
+                self.seek_pct_combo.setCurrentIndex(idx)
+                self.SEEK_PERCENT = seek_pct / 100.0
+
             if folder and os.path.exists(folder):
                 self.current_folder = folder
                 self.scan_folder(folder)
@@ -283,6 +342,7 @@ class TikTokPlayer(QMainWindow):
         self.current_folder = folder_to_save or ""
         _db_set("folder", self.current_folder)
         _db_set("volume", self.volume_slider.value())
+        _db_set("seek_percent", self.seek_pct_combo.currentData())
 
     def select_folder(self):
         folder = QFileDialog.getExistingDirectory(self, "Select Media Folder")
@@ -296,6 +356,12 @@ class TikTokPlayer(QMainWindow):
         self.audio_output.setVolume(value / 100.0)
         self.volume_value_label.setText(f"{value}%")
         if persist:
+            self.save_config()
+
+    def on_seek_pct_changed(self, index):
+        pct = self.seek_pct_combo.currentData()
+        if pct is not None:
+            self.SEEK_PERCENT = pct / 100.0
             self.save_config()
 
     def scan_folder(self, folder):

@@ -1,7 +1,7 @@
 import sys
 import os
 import random
-import json
+import sqlite3
 import math
 from PyQt6.QtCore import Qt, QUrl, QThread, QTimer, pyqtSignal
 from PyQt6.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout, 
@@ -14,14 +14,48 @@ from PyQt6.QtGui import QIcon, QKeySequence, QShortcut
 
 
 
-def get_config_path():
-    # Use user app data directory for config to avoid conflicts between dev and bundled app
+def get_db_path():
+    # Use user app data directory for DB to avoid conflicts between dev and bundled app
     app_data = os.path.expanduser("~\\AppData\\Roaming")
     config_dir = os.path.join(app_data, "MyVideoPlayer")
     os.makedirs(config_dir, exist_ok=True)
-    return os.path.join(config_dir, "config.json")
+    return os.path.join(config_dir, "config.db")
 
-CONFIG_FILE = get_config_path()
+DB_PATH = get_db_path()
+
+
+def _init_db():
+    """Initialize the SQLite database and create config table if not exists."""
+    conn = sqlite3.connect(DB_PATH)
+    conn.execute(
+        "CREATE TABLE IF NOT EXISTS config (key TEXT PRIMARY KEY, value TEXT)"
+    )
+    conn.commit()
+    conn.close()
+
+
+def _db_get(key, default=None):
+    """Get a config value from SQLite by key."""
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.execute("SELECT value FROM config WHERE key = ?", (key,))
+    row = cursor.fetchone()
+    conn.close()
+    return row[0] if row else default
+
+
+def _db_set(key, value):
+    """Set a config value in SQLite (upsert)."""
+    conn = sqlite3.connect(DB_PATH)
+    conn.execute(
+        "INSERT INTO config (key, value) VALUES (?, ?) "
+        "ON CONFLICT(key) DO UPDATE SET value = excluded.value",
+        (key, str(value)),
+    )
+    conn.commit()
+    conn.close()
+
+
+_init_db()
 SUPPORTED_EXT = ['.mp4', '.avi', '.mkv', '.mp3', '.wav', '.flac', '.m4a', '.mov']
 
 
@@ -232,32 +266,23 @@ class TikTokPlayer(QMainWindow):
             self._shortcuts.append(shortcut)
 
     def load_config(self):
-        if os.path.exists(CONFIG_FILE):
-            try:
-                with open(CONFIG_FILE, 'r') as f:
-                    config = json.load(f)
-                    folder = config.get("folder", "")
-                    volume = config.get("volume", self.DEFAULT_VOLUME)
-                    volume = max(0, min(100, int(volume)))
-                    self.volume_slider.setValue(volume)
-                    self.set_volume(volume, persist=False)
-                    if folder and os.path.exists(folder):
-                        self.current_folder = folder
-                        self.scan_folder(folder)
-            except Exception as e:
-                print("Failed to load config:", e)
+        try:
+            folder = _db_get("folder", "")
+            volume = _db_get("volume", str(self.DEFAULT_VOLUME))
+            volume = max(0, min(100, int(volume)))
+            self.volume_slider.setValue(volume)
+            self.set_volume(volume, persist=False)
+            if folder and os.path.exists(folder):
+                self.current_folder = folder
+                self.scan_folder(folder)
+        except Exception as e:
+            print("Failed to load config:", e)
 
     def save_config(self, folder=None):
         folder_to_save = self.current_folder if folder is None else folder
         self.current_folder = folder_to_save or ""
-        with open(CONFIG_FILE, 'w') as f:
-            json.dump(
-                {
-                    "folder": self.current_folder,
-                    "volume": self.volume_slider.value(),
-                },
-                f
-            )
+        _db_set("folder", self.current_folder)
+        _db_set("volume", self.volume_slider.value())
 
     def select_folder(self):
         folder = QFileDialog.getExistingDirectory(self, "Select Media Folder")

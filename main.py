@@ -319,6 +319,10 @@ class TikTokPlayer(QMainWindow):
     def load_config(self):
         try:
             folder = _db_get("folder", "")
+            if folder and os.path.exists(folder):
+                self.current_folder = folder
+                self.scan_folder(folder)
+
             volume = _db_get("volume", str(self.DEFAULT_VOLUME))
             volume = max(0, min(100, int(volume)))
             self.volume_slider.setValue(volume)
@@ -330,16 +334,10 @@ class TikTokPlayer(QMainWindow):
                 idx = self.SEEK_OPTIONS.index(seek_pct)
                 self.seek_pct_combo.setCurrentIndex(idx)
                 self.SEEK_PERCENT = seek_pct / 100.0
-
-            if folder and os.path.exists(folder):
-                self.current_folder = folder
-                self.scan_folder(folder)
         except Exception as e:
             print("Failed to load config:", e)
 
-    def save_config(self, folder=None):
-        folder_to_save = self.current_folder if folder is None else folder
-        self.current_folder = folder_to_save or ""
+    def save_config(self):
         _db_set("folder", self.current_folder)
         _db_set("volume", self.volume_slider.value())
         _db_set("seek_percent", self.seek_pct_combo.currentData())
@@ -348,7 +346,7 @@ class TikTokPlayer(QMainWindow):
         folder = QFileDialog.getExistingDirectory(self, "Select Media Folder")
         if folder:
             self.current_folder = folder
-            self.save_config(folder)
+            self.save_config()
             self.scan_folder(folder)
             self.setFocus() # return focus to main window to detect keys
 

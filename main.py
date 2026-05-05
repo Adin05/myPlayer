@@ -325,14 +325,18 @@ class TikTokPlayer(QMainWindow):
 
             volume = _db_get("volume", str(self.DEFAULT_VOLUME))
             volume = max(0, min(100, int(volume)))
+            self.volume_slider.blockSignals(True)
             self.volume_slider.setValue(volume)
+            self.volume_slider.blockSignals(False)
             self.set_volume(volume, persist=False)
 
             # Restore seek percent
             seek_pct = int(_db_get("seek_percent", "5"))
             if seek_pct in self.SEEK_OPTIONS:
+                self.seek_pct_combo.blockSignals(True)
                 idx = self.SEEK_OPTIONS.index(seek_pct)
                 self.seek_pct_combo.setCurrentIndex(idx)
+                self.seek_pct_combo.blockSignals(False)
                 self.SEEK_PERCENT = seek_pct / 100.0
         except Exception as e:
             print("Failed to load config:", e)
